@@ -1,4 +1,5 @@
 from vpython import *
+
 scene = canvas(width=600, height=600)
 
 #constants
@@ -11,7 +12,7 @@ mB = 0.8*M0
 q = mB/mA           # mass ratio
 dist = 1e11
 
-x1 = dist*mB/(mA+mB)
+x1 = -dist*mB/(mA+mB)
 x2 = dist*mA/(mA+mB)
 
 lobe_rad = 
@@ -41,14 +42,33 @@ def potential(x, y, z):
     sep_dist = starA.pos - starB.pos
     w_squared = G * starA.mass * (1 + q)/(sep_dist ** 3)
     
-    dist1 = ((starA.pos.x - x) ** 2 + y ** 2 + z ** 2) ** (-1/2)
-    dist2 = ((starB.pos.x - x) ** 2 + y ** 2 + z ** 2) ** (-1/2)
+    r1 = ((starA.pos.x - x) ** 2 + y ** 2 + z ** 2) ** (1/2)
+    r2 = ((starB.pos.x - x) ** 2 + y ** 2 + z ** 2) ** (1/2)
+    r3_squared = (x**2 + y**2 + z**2)
     
-    W = 1/dist1 + q/dist2+ 0.5*(1+q)*x1**2
+#    W = 1/r1 + 1/r2 + 0.5*(1+q)*x1**2
+    W = G*mA/r1 + G*mB/r2 + 0.5*w_squared*r3_squared
     return W
     
-    
+# find x value of lagrangian pt
 
+best_x = 0
+least_force = 1e100
+
+for i in range(100):
+    x = x1 + (x2-x1)*i/100
+    r1 = abs(x1-x)
+    r2 = abs(x2-x)
+    w_squared = G * starA.mass * (1 + q)/(sep_dist ** 3)
+    f = abs(G*mA/r1**2 - G*mB/r2**2 - w_squared*x)
+    
+    if f<least_force:
+        least_force = f
+        best_x = x
+        
+equipotential = potential(best_x, 0)
+    
+    
 t=0; dt=3600
     
 while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
