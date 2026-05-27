@@ -7,13 +7,14 @@ G = 6.67e-11
 M0 = 1.989e30       # solar mass
 Rs = 6.957e8        # radius of sun
 
-mA = 3.4*M0
-mB = 0.8*M0
+mA = 3.4
+mB = 0.8
 q = mB/mA           # mass ratio
 dist = 1e11
 
 x1 = -dist*mB/(mA+mB)
 x2 = dist*mA/(mA+mB)
+
 
 #lobe_rad = 
 
@@ -21,11 +22,77 @@ x2 = dist*mA/(mA+mB)
 starA = sphere(pos = vector(x1, 0, 0), radius = 2.7*Rs, color = color.yellow)
 starB = sphere(pos = vector(x2, 0, 0), radius = 3.4*Rs, color = color.blue)
 
+sep_dist = mag(starA.pos - starB.pos)
+
 # Please note that I made the radii of the earth and the Sun much too large, just so they're more visible. 
 # All other quantities are realistic.
 
-starA.mass = mA
-starB.mass = mB
+
+######################## USER INTERFACES ########################
+# button to start/pause simulation
+running = False
+button(text="Click to Run", pos=scene.title_anchor, bind=Run)
+def Run(b):
+    global running
+    running = not running
+    if running: 
+        b.text = "Click to Pause"
+        print("running")
+    else: 
+        b.text = "Click to Run"
+        print("not running")
+
+# sliders to adjust dist, mA, mB
+
+def update_system():
+    global x1, x2, dist, sep_dist, q
+    q = mB/mA
+    x1 = -dist*mB/(mA + mB)
+    x2 = dist*mA/(mA + mB)
+
+    starA.pos.x = x1
+    starB.pos.x = x2
+
+    sep_dist = mag(starA.pos - starB.pos)
+
+#######################
+# DISTANCE SLIDER
+#######################
+def changeDistSlider(evt):
+    global dist
+    dist = evt.value
+    dist_text.text = '{:1.2f}'.format(evt.value)
+    update_system()
+changeDist = slider(bind=changeDistSlider, min=0.5*1e11, max=2*1e11, value=dist)
+dist_text = wtext(text='{:1.2f}'.format(changeDist.value))
+
+
+#######################
+# Mass A SLIDER
+#######################
+def change_mASlider(evt):
+    global mA
+    mA = evt.value
+    mA_text.text = '{:1.2f}'.format(evt.value)
+    update_system()
+change_mA = slider(bind=change_mASlider, min=0.1, max=5, value=mA)
+mA_text = wtext(text='{:1.2f}'.format(change_mA.value))
+
+    
+#######################
+# Mass B SLIDER
+#######################
+def change_mBSlider(evt):
+    global mB
+    mB = evt.value
+    mB_text.text = '{:1.2f}'.format(evt.value)
+    update_system()
+change_mB = slider(bind=change_mBSlider, min=0.1, max=5, value=mB)
+mB_text = wtext(text='{:1.2f}'.format(change_mB.value))
+################################################################# 
+
+starA.mass = mA * M0
+starB.mass = mB * M0
 
 starA.velocity = vector(0,0,0)
 starB.velocity = vector(0,0,0)
@@ -39,7 +106,6 @@ def gravity(star, satellite):
     return -G*star.mass*satellite.mass*hat(rad)/(mag(rad)**2)
     
 
-sep_dist = mag(starA.pos - starB.pos)
 def potential(x, y, z):
 #    sep_dist = starA.pos - starB.pos
     w_squared = G * starA.mass * (1 + q)/(sep_dist ** 3)
@@ -49,7 +115,7 @@ def potential(x, y, z):
     r3_squared = x**2 + y**2 + z**2
     
 #    W = 1/r1 + 1/r2 + 0.5*(1+q)*x1**2
-    W = G*mA/r1 + G*mB/r2 + 0.5*w_squared*r3_squared
+    W = G*starA.mass/r1 + G*starB.mass/r2 + 0.5*w_squared*r3_squared
     return W
     
 # find x value of lagrangian pt
@@ -62,7 +128,7 @@ for i in range(200):
     r1 = abs(x1-x)
     r2 = abs(x2-x)
     w_squared = G * starA.mass * (1 + q)/(sep_dist ** 3)
-    f = abs(G*mA/r1**2 - G*mB/r2**2 - w_squared*x)
+    f = abs(G*starA.mass/r1**2 - G*starB.mass/r2**2 - w_squared*x)
     
     if f<least_force:
         least_force = f
@@ -90,15 +156,15 @@ t=0; dt=3600
     
 while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
     rate(1000)
-  
-    starA.acc = gravity(starB,starA)/starA.mass
-    starB.acc = gravity(starA,starB)/starB.mass
-    
-    starA.velocity = starA.velocity + starA.acc*dt
-    starB.velocity = starB.velocity + starB.acc*dt
-    
-    starA.pos = starA.pos + starA.velocity*dt
-    starB.pos = starB.pos + starB.velocity*dt
-     
-    
-    t = t+dt
+    if running:
+        starA.acc = gravity(starB,starA)/starA.mass
+        starB.acc = gravity(starA,starB)/starB.mass
+        
+        starA.velocity = starA.velocity + starA.acc*dt
+        starB.velocity = starB.velocity + starB.acc*dt
+        
+        starA.pos = starA.pos + starA.velocity*dt
+        starB.pos = starB.pos + starB.velocity*dt
+         
+        
+        t = t+dt
