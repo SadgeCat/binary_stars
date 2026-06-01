@@ -32,6 +32,7 @@ sep_dist = mag(starA.pos - starB.pos)
 # button to start/pause simulation
 running = False
 button(text="Click to Run", pos=scene.title_anchor, bind=Run)
+scene.append_to_title("\n\n")
 def Run(b):
     global running
     running = not running
@@ -43,7 +44,6 @@ def Run(b):
         print("not running")
 
 # sliders to adjust dist, mA, mB
-
 def update_system():
     global x1, x2, dist, sep_dist, q
     q = mB/mA
@@ -54,41 +54,73 @@ def update_system():
     starB.pos.x = x2
 
     sep_dist = mag(starA.pos - starB.pos)
+    
+    q_text.text = f"{q:.3f}"
+    
+    
+#######################
+# DISPLAY INFO
+######################
+scene.append_to_caption("\nMass Ratio q = ")
+q_text = wtext(text=f"{q:.3f}")
+scene.append_to_caption("\nRobe Lobe Radius = ")
+roche_text = wtext(text=f"idk")
+
 
 #######################
 # DISTANCE SLIDER
 #######################
+scene.append_to_caption("\n\n")
+scene.append_to_caption("Separation Dist. (m): ")
+scene.append_to_caption("\n")
 def changeDistSlider(evt):
     global dist
     dist = evt.value
-    dist_text.text = '{:1.2f}'.format(evt.value)
+    dist_text.text = f"{evt.value:.3e} m"
     update_system()
-changeDist = slider(bind=changeDistSlider, min=0.5*1e11, max=2*1e11, value=dist)
-dist_text = wtext(text='{:1.2f}'.format(changeDist.value))
+changeDist = slider(bind=changeDistSlider, min=0.5*1e11, max=2*1e11, value=dist, length=300)
+dist_text = wtext(text=f"{dist:.3e} m")
 
 
 #######################
 # Mass A SLIDER
 #######################
+scene.append_to_caption("\n\n")
+scene.append_to_caption("Star A Mass (Solar Masses): ")
+scene.append_to_caption("\n")
 def change_mASlider(evt):
     global mA
     mA = evt.value
-    mA_text.text = '{:1.2f}'.format(evt.value)
+    mA_text.text = f"{evt.value:.3f} M☉"
     update_system()
-change_mA = slider(bind=change_mASlider, min=0.1, max=5, value=mA)
-mA_text = wtext(text='{:1.2f}'.format(change_mA.value))
+change_mA = slider(bind=change_mASlider, min=0.1, max=5, value=mA, length=300)
+mA_text = wtext(text=f"{mA:.3f} M☉")
 
     
 #######################
 # Mass B SLIDER
 #######################
+scene.append_to_caption("\n\n")
+scene.append_to_caption("Star B Mass (Solar Masses): ")
+scene.append_to_caption("\n")
 def change_mBSlider(evt):
     global mB
     mB = evt.value
-    mB_text.text = '{:1.2f}'.format(evt.value)
+    mB_text.text = f"{evt.value:.3f} M☉"
     update_system()
-change_mB = slider(bind=change_mBSlider, min=0.1, max=5, value=mB)
-mB_text = wtext(text='{:1.2f}'.format(change_mB.value))
+change_mB = slider(bind=change_mBSlider, min=0.1, max=5, value=mB, length=300)
+mB_text = wtext(text=f"{mB:.3f} M☉")
+
+
+#######################
+# Redraw potential btn 
+#######################
+scene.append_to_caption("\n\n")
+button(text="Draw Equipotential", bind=draw_potential)
+
+
+
+scene.append_to_caption("\n\n\n")
 ################################################################# 
 
 starA.mass = mA * M0
@@ -118,39 +150,48 @@ def potential(x, y, z):
     W = G*starA.mass/r1 + G*starB.mass/r2 + 0.5*w_squared*r3_squared
     return W
     
-# find x value of lagrangian pt
-
-best_x = 0
-least_force = 1e100
-
-for i in range(200):
-    x = x1 + (x2-x1)*i/200
-    r1 = abs(x1-x)
-    r2 = abs(x2-x)
-    w_squared = G * starA.mass * (1 + q)/(sep_dist ** 3)
-    f = abs(G*starA.mass/r1**2 - G*starB.mass/r2**2 - w_squared*x)
+# find x value of lagrange pt
+def find_x():
+    best_x = 0
+    least_force = 1e100
     
-    if f<least_force:
-        least_force = f
-        best_x = x
+    for i in range(200):
+        x = x1 + (x2-x1)*i/200
+        r1 = abs(x1-x)
+        r2 = abs(x2-x)
+        w_squared = G * starA.mass * (1 + q)/(sep_dist ** 3)
+        f = abs(G*starA.mass/r1**2 - G*starB.mass/r2**2 - w_squared*x)
         
-equipotential = potential(best_x, 0, 0)
+        if f<least_force:
+            least_force = f
+            best_x = x
+    return best_x
+        
+equipotential = potential(find_x(), 0, 0)
     
 # calculate points close enough to the value of equipotential
-grid_size = 2 * dist
-step = 2e9
-pts_list = []
-for x in arange(-grid_size, grid_size, step):
-    for y in arange(-grid_size, grid_size, step):
-        W = potential(x, y, 0)
-        if abs(W - equipotential) < abs(equipotential)*1e-2:
-            pts_list.append(vector(x,y,0))
+spheres_list = []
+def draw_potential():
+    global spheres_list
+    for sph in spheres_list:
+        sph.visible = False
+    spheres_list = []
+    grid_size = 2 * dist
+    step = 2e9
+    pts_list = []
+    for x in arange(-grid_size, grid_size, step):
+        for y in arange(-grid_size, grid_size, step):
+            W = potential(x, y, 0)
+            if abs(W - equipotential) < abs(equipotential)*1e-2:
+                pts_list.append(vector(x,y,0))
+    
+#    p_curve = curve(pos=pts_list, color=color.cyan, radius=0.5*Rs)
 
-for p in pts_list:
-    print(p)
-    sphere(pos = p, radius = 1.2e9, color = color.white)
-
-print("done drawing equipotential")
+    for p in pts_list:
+        s = sphere(pos=p, radius=Rs, color=color.white, opacity=0.8)
+        spheres_list.append(s)
+        
+    print("done drawing equipotential")
     
 t=0; dt=3600
     
