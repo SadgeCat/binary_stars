@@ -126,8 +126,8 @@ scene.append_to_caption("\n\n\n")
 starA.mass = mA * M0
 starB.mass = mB * M0
 
-starA.velocity = vector(0,0,0)
-starB.velocity = vector(0,0,0)
+starA.velocity = (sqrt(G * starB.mass * abs(starA.pos.x))/sep_dist)*vector(0, -1, 0)
+starB.velocity = (sqrt(G * starA.mass * abs(starB.pos.x))/sep_dist)*vector(0, 1, 0)
 
 starA.acc = vector(0,0,0)
 starB.acc = vector(0,0,0)
@@ -188,7 +188,7 @@ def draw_potential():
 #    p_curve = curve(pos=pts_list, color=color.cyan, radius=0.5*Rs)
 
     for p in pts_list:
-        s = sphere(pos=p, radius=Rs, color=color.white, opacity=0.8)
+        s = sphere(pos=p, radius=Rs, color=color.white, opacity=0.9)
         spheres_list.append(s)
         
     print("done drawing equipotential")
