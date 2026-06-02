@@ -10,19 +10,21 @@ Rs = 6.957e8        # radius of sun
 mA = 3.4
 mB = 0.8
 q = mB/mA           # mass ratio
+q2 = 1/q
 dist = 1e11
 
 x1 = -dist*mB/(mA+mB)
 x2 = dist*mA/(mA+mB)
 
 
-#lobe_rad = 
-
 # 2 stars for binary star system
 starA = sphere(pos = vector(x1, 0, 0), radius = 2.7*Rs, color = color.yellow)
 starB = sphere(pos = vector(x2, 0, 0), radius = 3.4*Rs, color = color.blue)
 
 sep_dist = mag(starA.pos - starB.pos)
+
+lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
+
 
 # Please note that I made the radii of the earth and the Sun much too large, just so they're more visible. 
 # All other quantities are realistic.
@@ -56,6 +58,7 @@ def update_system():
     sep_dist = mag(starA.pos - starB.pos)
     
     q_text.text = f"{q:.3f}"
+    roche_text.text = f"{lobe_rad:.3e} m"
     
     
 #######################
@@ -64,7 +67,7 @@ def update_system():
 scene.append_to_caption("\nMass Ratio q = ")
 q_text = wtext(text=f"{q:.3f}")
 scene.append_to_caption("\nRobe Lobe Radius = ")
-roche_text = wtext(text=f"idk")
+roche_text = wtext(text=f"{lobe_rad:.3e} m")
 
 
 #######################
@@ -132,6 +135,12 @@ starB.velocity = (sqrt(G * starA.mass * abs(starB.pos.x))/sep_dist)*vector(0, 1,
 starA.acc = vector(0,0,0)
 starB.acc = vector(0,0,0)
 
+sum_mass = starA.mass + starB.mass
+reduced_mass = starA.mass * starB.mass / sum_mass
+
+momentum = reduced_mass * sep_dist * sqrt(G * sum_mass / sep_dist)
+#momentum = starA.mass * sep_dist * mag(starA.velocity)
+
 
 def gravity(star, satellite):
     rad = satellite.pos - star.pos
@@ -193,7 +202,11 @@ def draw_potential():
         
     print("done drawing equipotential")
     
+draw_potential()
+    
 t=0; dt=3600
+# custom inc in rad for now
+rad_inc_rate = 5e-6 * Rs
     
 while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
     rate(1000)
@@ -206,6 +219,32 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
         
         starA.pos = starA.pos + starA.velocity*dt
         starB.pos = starB.pos + starB.velocity*dt
+        
+        overflow = starA.radius - lobe_rad
+        if overflow < 0:
+            starA.radius += rad_inc_rate * dt
+        else:
+            dm = 5e23 * overflow/lobe_rad * dt
+            starA.mass -= dm
+            starB.mass += dm
+        
+            # updating variables
+            q = starB.mass/starA.mass
+            q2 = 1/q
+            reduced_mass = starA.mass * starB.mass / sum_mass
+            sep_dist = (momentum ** 2) / (reduced_mass ** 2 * G * sum_mass)
+#            sep_dist = momentum / (starA.mass * mag(starA.velocity))
+#            x1 = -sep_dist * starA.mass / sum_mass
+#            x2 = sep_dist * starB.mass / sum_mass
+#            starA.pos = vector(x1,0,0)
+#            starB.pos = vector(x2,0,0)
+            lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
+        
+        q_text.text = f"{q:.3f}"
+        roche_text.text = f"{lobe_rad:.3e} m"
+        dist_text.text = f"{sep_dist:.3e} m"
+        mA_text.text = f"{starA.mass/M0:.3f} M☉"
+        mB_text.text = f"{starB.mass/M0:.3f} M☉"
          
         
         t = t+dt
