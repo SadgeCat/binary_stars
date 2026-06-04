@@ -1,4 +1,4 @@
-from vpython import *
+Web VPython 3.2
 
 scene = canvas(width=600, height=600)
 
@@ -210,6 +210,7 @@ equipotential = potential(find_x(), 0, 0)
 spheres_list = []
 def draw_potential():
     global spheres_list
+    equipotential = potential(find_x(), 0, 0)
     for sph in spheres_list:
         sph.visible = False
     spheres_list = []
@@ -299,6 +300,8 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
             if t % (3600 * 1000) == 0:
                 print("radius of star B: " + starB.radius)
                 print("total momentum: " + mag(P))
+            if t % (3600 * 100) == 0:
+                draw_potential()
         
             # updating variables
             q = starB.mass/starA.mass
