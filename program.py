@@ -16,6 +16,12 @@ dist = 1e11
 x1 = -dist*mB/(mA+mB)
 x2 = dist*mA/(mA+mB)
 
+c1 = 1.5e6
+c2 = 3.14e-4
+
+#k = 1.6/(2.7*Rs)
+k = 1e-10
+
 
 # 2 stars for binary star system
 starA = sphere(pos = vector(x1, 0, 0), radius = 2.7*Rs, color = color.yellow)
@@ -24,6 +30,9 @@ starB = sphere(pos = vector(x2, 0, 0), radius = 3.4*Rs, color = color.blue)
 sep_dist = mag(starA.pos - starB.pos)
 
 lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
+lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
+
+starA.radius = lobe_rad * (1 + 1e-1)
 
 
 # Please note that I made the radii of the earth and the Sun much too large, just so they're more visible. 
@@ -142,6 +151,25 @@ momentum = reduced_mass * sep_dist * sqrt(G * sum_mass / sep_dist)
 #momentum = starA.mass * sep_dist * mag(starA.velocity)
 
 
+def mass_from_radius(R,C,k):
+    term = 2/k**3 - exp(-k*R) * (R**2/k + 2*R/k**2 + 2/k**3)
+    return 4*pi*C*term
+    
+C_a = starA.mass / mass_from_radius(starA.radius, 1, k)
+C_b = starB.mass / mass_from_radius(starB.radius, 1, k)
+
+def radius_from_mass(new_mass, C, k):
+    left = 0
+    right = 1e11
+    for i in range(50):
+        mid = (left + right)/2
+        if mass_from_radius(mid, C, k) > new_mass:
+            right = mid
+        else:
+            left = mid
+    return (left + right)/2
+    
+
 def gravity(star, satellite):
     rad = satellite.pos - star.pos
     return -G*star.mass*satellite.mass*hat(rad)/(mag(rad)**2)
@@ -207,7 +235,17 @@ draw_potential()
 t=0; dt=3600
 # custom inc in rad for now
 rad_inc_rate = 5e-6 * Rs
-    
+transfer_rate = 1e-7
+
+vel_graph = graph(title='Velocity over time', xtitle='t', ytitle='v')
+av_graph = gcurve(color=color.red)
+bv_graph = gcurve(color=color.blue)
+
+rad_graph = graph(title='Radius over time', xtitle='t', ytitle='r')
+ar_graph = gcurve(color=color.red)
+
+type = "detached"
+
 while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
     rate(1000)
     if running:
@@ -220,13 +258,47 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
         starA.pos = starA.pos + starA.velocity*dt
         starB.pos = starB.pos + starB.velocity*dt
         
-        overflow = starA.radius - lobe_rad
-        if overflow < 0:
-            starA.radius += rad_inc_rate * dt
+        vel_graph.select()
+        av_graph.plot(t, mag(starA.velocity))
+        #bv_graph.plot(t, mag(starB.velocity))
+        
+        rad_graph.select()
+        ar_graph.plot(t, starA.radius)
+        
+        A_overflow = starA.radius >= lobe_rad
+        B_overflow = starB.radius >= lobe_rad2
+        if A_overflow and B_overflow:
+            type = "contact"
+        elif A_overflow or B_overflow:
+            type = "semi-detached"
         else:
-            dm = 5e23 * overflow/lobe_rad * dt
-            starA.mass -= dm
-            starB.mass += dm
+            type = "detached"
+        
+        if type == "semi-detached":
+            if A_overflow:
+                overflow = starA.radius - lobe_rad
+#                dm = 5e23 * (overflow/lobe_rad) ** .3333333 * dt
+                dm = mass_from_radius(starA.radius, C_a, k) - mass_from_radius(lobe_rad, C_a, k)
+                starA.mass -= dm * transfer_rate * dt
+                starB.mass += dm * transfer_rate * dt
+            elif B_overflow:
+                overflow = starB.radius - lobe_rad2
+#                dm = 5e23 * (overflow/lobe_rad2) ** .3333333 * dt
+                dm = mass_from_radius(starB.radius, C_b, k) - mass_from_radius(lobe_rad2, C_b, k)
+                starB.mass -= dm * transfer_rate * dt
+                starA.mass += dm * transfer_rate * dt
+            
+            starA.radius = radius_from_mass(starA.mass, C_a, k)
+            starB.radius = radius_from_mass(starB.mass, C_b, k)
+            
+            # preserve linear momentum so COM doesn't move
+            P = starA.mass*starA.velocity + starB.mass*starB.velocity
+            v_cm = P/sum_mass
+            starA.velocity -= v_cm
+            starB.velocity -= v_cm
+            if t % (3600 * 1000) == 0:
+                print("radius of star B: " + starB.radius)
+                print("total momentum: " + mag(P))
         
             # updating variables
             q = starB.mass/starA.mass
@@ -238,7 +310,10 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
 #            x2 = sep_dist * starB.mass / sum_mass
 #            starA.pos = vector(x1,0,0)
 #            starB.pos = vector(x2,0,0)
+
+#            sep_dist = mag(starA.pos - starB.pos)
             lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
+            lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
         
         q_text.text = f"{q:.3f}"
         roche_text.text = f"{lobe_rad:.3e} m"
