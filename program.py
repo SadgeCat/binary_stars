@@ -32,7 +32,8 @@ sep_dist = mag(starA.pos - starB.pos)
 lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
 lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
 
-starA.radius = lobe_rad * (1 + 1e-1)
+# make star overflow
+starA.radius = lobe_rad * (1 + 1e-2)
 
 
 # Please note that I made the radii of the earth and the Sun much too large, just so they're more visible. 
@@ -56,8 +57,9 @@ def Run(b):
 
 # sliders to adjust dist, mA, mB
 def update_system():
-    global x1, x2, dist, sep_dist, q
+    global x1, x2, dist, sep_dist, q, q2, lobe_rad, lobe_rad2, sum_mass, reduced_mass, momentum
     q = mB/mA
+    q2 = 1/q
     x1 = -dist*mB/(mA + mB)
     x2 = dist*mA/(mA + mB)
 
@@ -65,6 +67,17 @@ def update_system():
     starB.pos.x = x2
 
     sep_dist = mag(starA.pos - starB.pos)
+    lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
+    lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
+    
+    starA.velocity = (sqrt(G * starB.mass * abs(starA.pos.x))/sep_dist)*vector(0, -1, 0)
+    starB.velocity = (sqrt(G * starA.mass * abs(starB.pos.x))/sep_dist)*vector(0, 1, 0)
+    
+    sum_mass = starA.mass + starB.mass
+    reduced_mass = starA.mass * starB.mass / sum_mass
+    momentum = reduced_mass * sep_dist * sqrt(G * sum_mass / sep_dist)
+    
+    draw_potential()
     
     q_text.text = f"{q:.3f}"
     roche_text.text = f"{lobe_rad:.3e} m"
@@ -101,8 +114,10 @@ scene.append_to_caption("\n\n")
 scene.append_to_caption("Star A Mass (Solar Masses): ")
 scene.append_to_caption("\n")
 def change_mASlider(evt):
-    global mA
+    global mA, C_a
     mA = evt.value
+    starA.mass = mA * M0
+    C_a = starA.mass / mass_from_radius(starA.radius, 1, k)
     mA_text.text = f"{evt.value:.3f} M☉"
     update_system()
 change_mA = slider(bind=change_mASlider, min=0.1, max=5, value=mA, length=300)
@@ -116,8 +131,10 @@ scene.append_to_caption("\n\n")
 scene.append_to_caption("Star B Mass (Solar Masses): ")
 scene.append_to_caption("\n")
 def change_mBSlider(evt):
-    global mB
+    global mB, C_b
     mB = evt.value
+    starB.mass = mB * M0
+    C_b = starB.mass / mass_from_radius(starB.radius, 1, k)
     mB_text.text = f"{evt.value:.3f} M☉"
     update_system()
 change_mB = slider(bind=change_mBSlider, min=0.1, max=5, value=mB, length=300)
@@ -229,7 +246,7 @@ def draw_potential():
         s = sphere(pos=p, radius=Rs, color=color.white, opacity=0.9)
         spheres_list.append(s)
         
-    print("done drawing equipotential")
+#    print("done drawing equipotential")
     
 draw_potential()
     
@@ -258,6 +275,8 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
         
         starA.pos = starA.pos + starA.velocity*dt
         starB.pos = starB.pos + starB.velocity*dt
+        
+        P = starA.mass*starA.velocity + starB.mass*starB.velocity
         
         vel_graph.select()
         av_graph.plot(t, mag(starA.velocity))
@@ -297,11 +316,6 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
             v_cm = P/sum_mass
             starA.velocity -= v_cm
             starB.velocity -= v_cm
-            if t % (3600 * 1000) == 0:
-                print("radius of star B: " + starB.radius)
-                print("total momentum: " + mag(P))
-            if t % (3600 * 100) == 0:
-                draw_potential()
         
             # updating variables
             q = starB.mass/starA.mass
@@ -317,6 +331,12 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
 #            sep_dist = mag(starA.pos - starB.pos)
             lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
             lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
+            
+        if t % (3600 * 1000) == 0:
+            print("radius of star B: " + starB.radius)
+            print("total momentum: " + mag(P))
+        if t % (3600 * 100) == 0:
+            draw_potential()
         
         q_text.text = f"{q:.3f}"
         roche_text.text = f"{lobe_rad:.3e} m"
