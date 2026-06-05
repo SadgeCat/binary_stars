@@ -16,9 +16,6 @@ dist = 1e11
 x1 = -dist*mB/(mA+mB)
 x2 = dist*mA/(mA+mB)
 
-c1 = 1.5e6
-c2 = 3.14e-4
-
 #k = 1.6/(2.7*Rs)
 k = 1e-10
 
@@ -44,7 +41,6 @@ starA.radius = lobe_rad * (1 + 1e-2)
 # button to start/pause simulation
 running = False
 button(text="Click to Run", pos=scene.title_anchor, bind=Run)
-scene.append_to_title("\n\n")
 def Run(b):
     global running
     running = not running
@@ -54,6 +50,53 @@ def Run(b):
     else: 
         b.text = "Click to Run"
         print("not running")
+        
+button(text="Reset", pos=scene.title_anchor, bind=reset)
+scene.append_to_title("\n\n")
+def reset():
+    global mA, mB, x1, x2, dist, sep_dist, q, q2, lobe_rad, lobe_rad2, sum_mass, reduced_mass, momentum
+    mA = 3.4
+    mB = 0.8
+    q = mB/mA
+    q2 = 1/q
+    x1 = -dist*mB/(mA + mB)
+    x2 = dist*mA/(mA + mB)
+
+    starA.pos = vector(x1, 0, 0)
+    starB.pos = vector(x2, 0, 0)
+
+    sep_dist = mag(starA.pos - starB.pos)
+    lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
+    lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
+    
+    starA.mass = mA * M0
+    starB.mass = mB * M0
+    
+    starA.radius = lobe_rad * (1 + 1e-2)
+    starB.radius = 3.4*Rs
+    
+    starA.velocity = (sqrt(G * starB.mass * abs(starA.pos.x))/sep_dist)*vector(0, -1, 0)
+    starB.velocity = (sqrt(G * starA.mass * abs(starB.pos.x))/sep_dist)*vector(0, 1, 0)
+    
+    starA.acc = vector(0,0,0)
+    starB.acc = vector(0,0,0)
+    
+    sum_mass = starA.mass + starB.mass
+    reduced_mass = starA.mass * starB.mass / sum_mass
+    
+    momentum = reduced_mass * sep_dist * sqrt(G * sum_mass / sep_dist)
+#    changeDistSlider(sep_dist)
+#    change_mASlider(mA)
+#    change_mBSlider(mB)
+    dist_text.text = f"{sep_dist:.3e} m"
+    mA_text.text = f"{mA:.3f} M☉"
+    mB_text.text = f"{mB:.3f} M☉"
+    
+    draw_potential()
+    
+    q_text.text = f"{q:.3f}"
+    roche_text.text = f"{lobe_rad:.3e} m"
+        
 
 # sliders to adjust dist, mA, mB
 def update_system():
