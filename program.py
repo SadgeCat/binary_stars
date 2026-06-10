@@ -47,6 +47,7 @@ def Run(b):
     if running: 
         b.text = "Click to Pause"
         print("running")
+        print(scene.range)
     else: 
         b.text = "Click to Run"
         print("not running")
@@ -73,7 +74,7 @@ def reset():
     starB.mass = mB * M0
     
     starA.radius = lobe_rad * (1 + 1e-2)
-    starB.radius = 3.4*Rs
+    starB.radius = radius_from_mass(starB.mass, C_b, k)
     
     starA.velocity = (sqrt(G * starB.mass * abs(starA.pos.x))/sep_dist)*vector(0, -1, 0)
     starB.velocity = (sqrt(G * starA.mass * abs(starB.pos.x))/sep_dist)*vector(0, 1, 0)
@@ -96,6 +97,10 @@ def reset():
     
     q_text.text = f"{q:.3f}"
     roche_text.text = f"{lobe_rad:.3e} m"
+    
+    scene.autoscale = False
+    scene.range = scale
+    scene.autoscale = True
         
 
 # sliders to adjust dist, mA, mB
@@ -268,7 +273,7 @@ equipotential = potential(find_x(), 0, 0)
     
 # calculate points close enough to the value of equipotential
 spheres_list = []
-def draw_potential():
+def draw_potential(b):
     global spheres_list
     equipotential = potential(find_x(), 0, 0)
     for sph in spheres_list:
@@ -292,18 +297,26 @@ def draw_potential():
 #    print("done drawing equipotential")
     
 draw_potential()
+scale = scene.range
     
 t=0; dt=3600
 # custom inc in rad for now
 rad_inc_rate = 5e-6 * Rs
 transfer_rate = 1e-7
 
-vel_graph = graph(title='Velocity over time', xtitle='t', ytitle='v')
-av_graph = gcurve(color=color.red)
-bv_graph = gcurve(color=color.blue)
+graph_w = 480
+graph_h = 360
+vel_graph = graph(title='Velocity over time', xtitle='Time', ytitle='Velocity', width=graph_w, height=graph_h, align='left')
+av_graph = gcurve(color=color.red, label='StarA Velocity')
+bv_graph = gcurve(color=color.blue, label='StarB Velocity')
 
-rad_graph = graph(title='Radius over time', xtitle='t', ytitle='r')
-ar_graph = gcurve(color=color.red)
+rad_graph = graph(title='Radius over time', xtitle='Time', ytitle='Radius', width=graph_w, height=graph_h, align='left')
+ar_graph = gcurve(color=color.red, label='StarA Radius')
+br_graph = gcurve(color=color.blue, label='StarB Radius')
+
+mass_graph = graph(title='Mass over time', xtitle='Time', ytitle='Mass', width=graph_w, height=graph_h, align='left')
+am_graph = gcurve(color=color.red, label='StarA Mass')
+bm_graph = gcurve(color=color.blue, label='StarB Mass')
 
 type = "detached"
 
@@ -320,13 +333,6 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
         starB.pos = starB.pos + starB.velocity*dt
         
         P = starA.mass*starA.velocity + starB.mass*starB.velocity
-        
-        vel_graph.select()
-        av_graph.plot(t, mag(starA.velocity))
-        #bv_graph.plot(t, mag(starB.velocity))
-        
-        rad_graph.select()
-        ar_graph.plot(t, starA.radius)
         
         A_overflow = starA.radius >= lobe_rad
         B_overflow = starB.radius >= lobe_rad2
@@ -364,21 +370,38 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
             q = starB.mass/starA.mass
             q2 = 1/q
             reduced_mass = starA.mass * starB.mass / sum_mass
-            sep_dist = (momentum ** 2) / (reduced_mass ** 2 * G * sum_mass)
-#            sep_dist = momentum / (starA.mass * mag(starA.velocity))
-#            x1 = -sep_dist * starA.mass / sum_mass
-#            x2 = sep_dist * starB.mass / sum_mass
-#            starA.pos = vector(x1,0,0)
-#            starB.pos = vector(x2,0,0)
-
+            
+            # using conservation of angular momentum to calc vel
+#            sep_dist = mag(starB.pos - starA.pos)
+#            v_rel = momentum / (reduced_mass * sep_dist)
+#            r_hat = hat(starB.pos - starA.pos)
+#            t_hat = vector(-r_hat.y, r_hat.x, 0)
+#            vA = v_rel * starB.mass / (starA.mass + starB.mass)
+#            vB = v_rel * starA.mass / (starA.mass + starB.mass)
+#            starA.velocity = -vA * t_hat
+#            starB.velocity =  vB * t_hat
+            
+            # not much mass is transferred and stop really fast
 #            sep_dist = mag(starA.pos - starB.pos)
+
+            # change separation dist using conservation of momentum but only reflected in lobe_rad not actual dist between stars
+            sep_dist = (momentum ** 2) / (reduced_mass ** 2 * G * sum_mass)
+#            angle1 = atan2(starA.pos.y / starA.pos.x)
+#            angle2 = atan2(starB.pos.y / starB.pos.x)
+#            x1 = -sep_dist * starB.mass / sum_mass
+#            x2 = sep_dist * starA.mass / sum_mass
+#            newpos1 = vector(x1 * cos(angle1), x1 * sin(angle1), 0)
+#            newpos2 = vector(x2 * cos(angle2), x2 * sin(angle2), 0)
+#            starA.pos = newpos1
+#            starB.pos = newpos2
+
             lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
             lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
             
         if t % (3600 * 1000) == 0:
             print("radius of star B: " + starB.radius)
             print("total momentum: " + mag(P))
-        if t % (3600 * 100) == 0:
+        if t % (3600 * 10) == 0:
             draw_potential()
         
         q_text.text = f"{q:.3f}"
@@ -386,6 +409,18 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
         dist_text.text = f"{sep_dist:.3e} m"
         mA_text.text = f"{starA.mass/M0:.3f} M☉"
         mB_text.text = f"{starB.mass/M0:.3f} M☉"
+        
+        vel_graph.select()
+        av_graph.plot(t, mag(starA.velocity))
+        bv_graph.plot(t, mag(starB.velocity))
+        
+        rad_graph.select()
+        ar_graph.plot(t, starA.radius)
+        br_graph.plot(t, starB.radius)
+        
+        mass_graph.select()
+        am_graph.plot(t, starA.mass)
+        bm_graph.plot(t, starB.mass)
          
         
         t = t+dt
