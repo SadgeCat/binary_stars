@@ -20,9 +20,15 @@ x2 = dist*mA/(mA+mB)
 k = 1e-10
 
 
+bkg = box(pos = vector(0, 0, -5*Rs), size=vec(1000*Rs, 1000*Rs, 1), texture="https://i.imgur.com/UiEicbd.jpeg")
+bkg.visible = True
+
 # 2 stars for binary star system
 starA = sphere(pos = vector(x1, 0, 0), radius = 2.7*Rs, color = color.yellow)
 starB = sphere(pos = vector(x2, 0, 0), radius = 3.4*Rs, color = color.blue)
+
+mergedStar = sphere(pos = vector(0, 0, 0), radius = (starA.radius + starB.radius) * 0.95, color = color.white, texture="https://i.imgur.com/mS27qdf.jpeg")
+mergedStar.visible = False
 
 sep_dist = mag(starA.pos - starB.pos)
 
@@ -31,6 +37,9 @@ lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q
 
 # make star overflow
 starA.radius = lobe_rad * (1 + 1e-2)
+starB.radius = lobe_rad2 * (1 + 1e-2)
+
+#test = sphere(pos = vector(0, 0, 0), radius = lobe_rad, color = color.yellow)
 
 
 # Please note that I made the radii of the earth and the Sun much too large, just so they're more visible. 
@@ -55,11 +64,16 @@ def Run(b):
 button(text="Reset", pos=scene.title_anchor, bind=reset)
 scene.append_to_title("\n\n")
 def reset():
-    global mA, mB, x1, x2, dist, sep_dist, q, q2, lobe_rad, lobe_rad2, sum_mass, reduced_mass, momentum
+    global mA, mB, x1, x2, dist, sep_dist, q, q2, lobe_rad, lobe_rad2, sum_mass, reduced_mass, momentum, C_a, C_b, keep_running
+    keep_running = True
+    starA.visible = True
+    starB.visible = True
+    mergedStar.visible = False
     mA = 3.4
     mB = 0.8
     q = mB/mA
     q2 = 1/q
+    dist = 1e11
     x1 = -dist*mB/(mA + mB)
     x2 = dist*mA/(mA + mB)
 
@@ -74,7 +88,8 @@ def reset():
     starB.mass = mB * M0
     
     starA.radius = lobe_rad * (1 + 1e-2)
-    starB.radius = radius_from_mass(starB.mass, C_b, k)
+    starB.radius = 3.4 * Rs
+#    starB.radius = radius_from_mass(starB.mass, C_b, k)
     
     starA.velocity = (sqrt(G * starB.mass * abs(starA.pos.x))/sep_dist)*vector(0, -1, 0)
     starB.velocity = (sqrt(G * starA.mass * abs(starB.pos.x))/sep_dist)*vector(0, 1, 0)
@@ -89,9 +104,18 @@ def reset():
 #    changeDistSlider(sep_dist)
 #    change_mASlider(mA)
 #    change_mBSlider(mB)
-    dist_text.text = f"{sep_dist:.3e} m"
+    dist_text.text = f"{dist:.3e} m"
     mA_text.text = f"{mA:.3f} M☉"
     mB_text.text = f"{mB:.3f} M☉"
+    
+    changeDist.value = dist
+    change_mA.value = mA
+    change_mB.value = mB
+    
+    C_a = starA.mass / mass_from_radius(starA.radius, 1, k)
+    C_b = starB.mass / mass_from_radius(starB.radius, 1, k)
+    Ca_text.text = f"{C_a:.3e}"
+    Cb_text.text = f"{C_b:.3e}"
     
     draw_potential()
     
@@ -105,7 +129,7 @@ def reset():
 
 # sliders to adjust dist, mA, mB
 def update_system():
-    global x1, x2, dist, sep_dist, q, q2, lobe_rad, lobe_rad2, sum_mass, reduced_mass, momentum
+    global x1, x2, dist, sep_dist, q, q2, lobe_rad, lobe_rad2, sum_mass, reduced_mass, momentum, C_a, C_b
     q = mB/mA
     q2 = 1/q
     x1 = -dist*mB/(mA + mB)
@@ -125,6 +149,11 @@ def update_system():
     reduced_mass = starA.mass * starB.mass / sum_mass
     momentum = reduced_mass * sep_dist * sqrt(G * sum_mass / sep_dist)
     
+    C_a = starA.mass / mass_from_radius(starA.radius, 1, k)
+    C_b = starB.mass / mass_from_radius(starB.radius, 1, k)
+    Ca_text.text = f"{C_a:.3e}"
+    Cb_text.text = f"{C_b:.3e}"
+    
     draw_potential()
     
     q_text.text = f"{q:.3f}"
@@ -138,6 +167,10 @@ scene.append_to_caption("\nMass Ratio q = ")
 q_text = wtext(text=f"{q:.3f}")
 scene.append_to_caption("\nRobe Lobe Radius = ")
 roche_text = wtext(text=f"{lobe_rad:.3e} m")
+scene.append_to_caption("\nMass Density Const of A = ")
+Ca_text = wtext(text=f"{C_a:.3e}")
+scene.append_to_caption("\nMass Density Const of B = ")
+Cb_text = wtext(text=f"{C_b:.3e}")
 
 
 #######################
@@ -222,6 +255,8 @@ def mass_from_radius(R,C,k):
     
 C_a = starA.mass / mass_from_radius(starA.radius, 1, k)
 C_b = starB.mass / mass_from_radius(starB.radius, 1, k)
+Ca_text.text = f"{C_a:.3e}"
+Cb_text.text = f"{C_b:.3e}"
 
 def radius_from_mass(new_mass, C, k):
     left = 0
@@ -320,7 +355,9 @@ bm_graph = gcurve(color=color.blue, label='StarB Mass')
 
 type = "detached"
 
-while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
+keep_running = True
+
+while(True):
     rate(1000)
     if running:
         starA.acc = gravity(starB,starA)/starA.mass
@@ -372,20 +409,20 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
             reduced_mass = starA.mass * starB.mass / sum_mass
             
             # using conservation of angular momentum to calc vel
-#            sep_dist = mag(starB.pos - starA.pos)
-#            v_rel = momentum / (reduced_mass * sep_dist)
-#            r_hat = hat(starB.pos - starA.pos)
-#            t_hat = vector(-r_hat.y, r_hat.x, 0)
-#            vA = v_rel * starB.mass / (starA.mass + starB.mass)
-#            vB = v_rel * starA.mass / (starA.mass + starB.mass)
-#            starA.velocity = -vA * t_hat
-#            starB.velocity =  vB * t_hat
+            sep_dist = mag(starB.pos - starA.pos)
+            v_rel = momentum / (reduced_mass * sep_dist)
+            r_hat = hat(starB.pos - starA.pos)
+            t_hat = vector(-r_hat.y, r_hat.x, 0)
+            vA = v_rel * starB.mass / (starA.mass + starB.mass)
+            vB = v_rel * starA.mass / (starA.mass + starB.mass)
+            starA.velocity = -vA * t_hat
+            starB.velocity =  vB * t_hat
             
             # not much mass is transferred and stop really fast
 #            sep_dist = mag(starA.pos - starB.pos)
 
             # change separation dist using conservation of momentum but only reflected in lobe_rad not actual dist between stars
-            sep_dist = (momentum ** 2) / (reduced_mass ** 2 * G * sum_mass)
+#            sep_dist = (momentum ** 2) / (reduced_mass ** 2 * G * sum_mass)
 #            angle1 = atan2(starA.pos.y / starA.pos.x)
 #            angle2 = atan2(starB.pos.y / starB.pos.x)
 #            x1 = -sep_dist * starB.mass / sum_mass
@@ -397,11 +434,50 @@ while((starA.pos-starB.pos).mag>(starA.radius+starB.radius)):
 
             lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
             lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
+        elif type == "contact" and keep_running:
+            if (starA.pos-starB.pos).mag < (starA.radius+starB.radius):
+                keep_running = False
+                starA.visible = False
+                starB.visible = False
+                mergedStar.radius = (starA.radius + starB.radius) * 0.95
+                mergedStar.mass = starA.mass + starB.mass
+                mergedStar.visible = True
+            else:
+                overflow1 = starA.radius - lobe_rad
+                overflow2 = starB.radius - lobe_rad2
+                dm1 = mass_from_radius(starA.radius, C_a, k) - mass_from_radius(lobe_rad, C_a, k)
+                dm2 = mass_from_radius(starB.radius, C_b, k) - mass_from_radius(lobe_rad2, C_b, k)
+                starA.mass += (dm2 - dm1) * transfer_rate * dt
+                starB.mass += (dm1 - dm2) * transfer_rate * dt
+                
+                starA.radius = radius_from_mass(starA.mass, C_a, k)
+                starB.radius = radius_from_mass(starB.mass, C_b, k)
+                
+                # preserve linear momentum so COM doesn't move
+                P = starA.mass*starA.velocity + starB.mass*starB.velocity
+                v_cm = P/sum_mass
+                starA.velocity -= v_cm
+                starB.velocity -= v_cm
+            
+                # updating variables
+                q = starB.mass/starA.mass
+                q2 = 1/q
+                reduced_mass = starA.mass * starB.mass / sum_mass
+                
+                # using conservation of angular momentum to calc vel
+                sep_dist = mag(starB.pos - starA.pos)
+                v_rel = momentum / (reduced_mass * sep_dist)
+                r_hat = hat(starB.pos - starA.pos)
+                t_hat = vector(-r_hat.y, r_hat.x, 0)
+                vA = v_rel * starB.mass / (starA.mass + starB.mass)
+                vB = v_rel * starA.mass / (starA.mass + starB.mass)
+                starA.velocity = -vA * t_hat
+                starB.velocity =  vB * t_hat
             
         if t % (3600 * 1000) == 0:
             print("radius of star B: " + starB.radius)
             print("total momentum: " + mag(P))
-        if t % (3600 * 10) == 0:
+        if t % (3600 * 10) == 0 and (starA.pos-starB.pos).mag > (starA.radius+starB.radius):
             draw_potential()
         
         q_text.text = f"{q:.3f}"
