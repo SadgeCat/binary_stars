@@ -25,8 +25,8 @@ bkg.visible = True
 
 
 # 2 stars for binary star system
-starA = sphere(pos = vector(x1, 0, 0), radius = 2.7*Rs, color = color.yellow)
-starB = sphere(pos = vector(x2, 0, 0), radius = 3.4*Rs, color = color.blue)
+starA = sphere(pos = vector(x1, 0, 0), radius = 2.7*Rs, color = color.white, texture="https://i.imgur.com/sDNTWNi.jpeg")
+starB = sphere(pos = vector(x2, 0, 0), radius = 3.4*Rs, color = color.white, texture="https://i.imgur.com/y0MpbvN.png")
 
 mergedStar = sphere(pos = vector(0, 0, 0), radius = (starA.radius + starB.radius) * 0.95, color = color.white, texture="https://i.imgur.com/mS27qdf.jpeg")
 mergedStar.visible = False
@@ -73,13 +73,13 @@ def Run(b):
     else: 
         b.text = "Click to Run"
 #        print("not running")
-        if has_reset:
-            change_mA.disabled = False
-            change_mB.disabled = False
-            changeDist.disabled = False
-            A_over.disabled = False
-            B_over.disabled = False
-            has_reset = False
+#        if has_reset:
+#            change_mA.disabled = False
+#            change_mB.disabled = False
+#            changeDist.disabled = False
+#            A_over.disabled = False
+#            B_over.disabled = False
+#            has_reset = False
 
 has_reset = False
 button(text="Reset", pos=scene.title_anchor, bind=reset)
@@ -95,6 +95,8 @@ def reset():
         A_over.disabled = False
         B_over.disabled = False
         has_reset = False
+    if not drawP:
+        change_draw()
     keep_running = True
     starA.visible = True
     starB.visible = True
@@ -216,21 +218,15 @@ def update_system():
     
     type_text.text = type
         
-    
-#scene.append_to_caption("Upon loading the program, the scene will display a binary star system with their Roche lobe equipotential drawn.\n")
-#scene.append_to_caption("The separation distance, starA mass, and starB mass sliders can be used to adjust those values respectively and the equipotential\n")
-#scene.append_to_caption("is redrawn to reflect those changes.\n")
-#scene.append_to_caption("Once the user is done adjusting the sliders, click the run button to begin the simulation. Click the reset button to reset the inputs\n")
-#scene.append_to_caption("to their initial values.\n")
-#scene.append_to_caption("All the graphs display properties/info of the stars over time like their velocities, mass, and radius.\ \MH☉")    
 
-scene.append_to_caption("Upon loading the program, the scene will display a binary star system with their Roche lobe equipotential drawn.\n")
-scene.append_to_caption("The separation distance, starA mass, and starB mass sliders can be used to adjust those values respectively and the equipotential\n")
+scene.append_to_caption("Upon loading the program, the <b>scene</b> will display a binary star system with their <b>Roche lobe equipotential</b> drawn.\n")
+scene.append_to_caption("The <b>separation distance</b>, <b>starA mass</b>, and <b>starB mass sliders</b> can be used to adjust those values respectively and the equipotential\n")
 scene.append_to_caption("is redrawn to reflect those changes.\n")
-scene.append_to_caption("Once the user is done adjusting the sliders, click the run button to begin the simulation. Click the reset button to reset the inputs\n")
-scene.append_to_caption("to their initial values.\n")
+scene.append_to_caption("The <b>Star A Overflow</b> and <b>Star B Overflow buttons</b> enlarge the radius of the star beyond its Roche lobe to test <b>semi-detached</b> and <b>contact binaries</b>.\n")
+scene.append_to_caption("The <b>Equipotential button</b> toggles continuous Roche lobe updates. Click the <b>run button</b> to begin the simulation.\n")
+scene.append_to_caption("Click the <b>reset button</b> to reset the inputs to their initial values.\n")
 scene.append_to_caption("All the graphs display properties/info of the stars over time like their velocities, mass, and radius.\n\n")
-scene.append_to_caption("We approximated the density per unit volume of the stars using an exponential function \\(e^{-kt}\\) for some constant \\(k\\), which\n")
+scene.append_to_caption("We approximated the <b>density per unit volume</b> of the stars using an exponential function \\(e^{-kt}\\) for some constant \\(k\\), which\n")
 scene.append_to_caption("we will call the <i>mass density constant</i> in this project. This is meant to give the viewer an idea of the relative densities of the\n")
 scene.append_to_caption("stars compared to each other.\n\n")
     
@@ -553,6 +549,8 @@ while(True):
         elif type == "contact" and keep_running:
             if (starA.pos-starB.pos).mag < (starA.radius+starB.radius):
                 keep_running = False
+                if drawP:
+                    change_draw()
                 starA.visible = False
                 starB.visible = False
                 mergedStar.radius = (starA.radius + starB.radius) * 0.95
@@ -598,37 +596,38 @@ while(True):
 #            print("total momentum: " + mag(P))
         if t % (3600 * 10) == 0 and (starA.pos-starB.pos).mag > (starA.radius+starB.radius) and drawP:
             draw_potential()
-        
-        q_text.text = f"{q:.3f}"
-        rocheA_text.text = f"{lobe_rad/Rs:.3f} R☉"
-        rocheB_text.text = f"{lobe_rad2/Rs:.3f} R☉"
-        dist_text.text = f"{sep_dist/Rs:.3f} R☉"
-        mA_text.text = f"{starA.mass/M0:.3f} M☉"
-        mB_text.text = f"{starB.mass/M0:.3f} M☉"
-        
-        
-        rad_graph.select()
-        ar_graph.plot(t/(3600*24), starA.radius/Rs)
-        br_graph.plot(t/(3600*24), starB.radius/Rs)
-        
-#        roche_graph.select()
-        alobe_graph.plot(t/(3600*24), lobe_rad/Rs)
-        blobe_graph.plot(t/(3600*24), lobe_rad2/Rs)
-        
-        mass_graph.select()
-        am_graph.plot(t/(3600*24), starA.mass/M0)
-        bm_graph.plot(t/(3600*24), starB.mass/M0)
-        
-        vel_graph.select()
-        av_graph.plot(t/(3600*24), mag(starA.velocity))
-        bv_graph.plot(t/(3600*24), mag(starB.velocity))
-        
-        ratio_graph.select()
-        q_graph.plot(t/(3600*24), q)
-        
-        period_graph.select()
-        T = 2*pi*sqrt(sep_dist**3 / (G*sum_mass))
-        p_graph.plot(t/(3600*24), T/(3600*24))
+            
+        if keep_running:
+            q_text.text = f"{q:.3f}"
+            rocheA_text.text = f"{lobe_rad/Rs:.3f} R☉"
+            rocheB_text.text = f"{lobe_rad2/Rs:.3f} R☉"
+            dist_text.text = f"{sep_dist/Rs:.3f} R☉"
+            mA_text.text = f"{starA.mass/M0:.3f} M☉"
+            mB_text.text = f"{starB.mass/M0:.3f} M☉"
+            
+            
+            rad_graph.select()
+            ar_graph.plot(t/(3600*24), starA.radius/Rs)
+            br_graph.plot(t/(3600*24), starB.radius/Rs)
+            
+    #        roche_graph.select()
+            alobe_graph.plot(t/(3600*24), lobe_rad/Rs)
+            blobe_graph.plot(t/(3600*24), lobe_rad2/Rs)
+            
+            mass_graph.select()
+            am_graph.plot(t/(3600*24), starA.mass/M0)
+            bm_graph.plot(t/(3600*24), starB.mass/M0)
+            
+            vel_graph.select()
+            av_graph.plot(t/(3600*24), mag(starA.velocity))
+            bv_graph.plot(t/(3600*24), mag(starB.velocity))
+            
+            ratio_graph.select()
+            q_graph.plot(t/(3600*24), q)
+            
+            period_graph.select()
+            T = 2*pi*sqrt(sep_dist**3 / (G*sum_mass))
+            p_graph.plot(t/(3600*24), T/(3600*24))
                  
         
         t = t+dt
