@@ -23,6 +23,7 @@ k = 1e-10
 bkg = box(pos = vector(0, 0, -5*Rs), size=vec(1000*Rs, 1000*Rs, 1), texture="https://i.imgur.com/UiEicbd.jpeg")
 bkg.visible = True
 
+
 # 2 stars for binary star system
 starA = sphere(pos = vector(x1, 0, 0), radius = 2.7*Rs, color = color.yellow)
 starB = sphere(pos = vector(x2, 0, 0), radius = 3.4*Rs, color = color.blue)
@@ -36,8 +37,15 @@ lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + 
 lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
 
 # make star overflow
-starA.radius = lobe_rad * (1 + 1e-2)
-starB.radius = lobe_rad2 * (1 + 1e-2)
+def setA_radius():
+    starA.radius = lobe_rad * (1 + 1e-1)
+    update_system()
+def setB_radius():
+    starB.radius = lobe_rad2 * (1 + 1e-1)
+    update_system()
+    
+#starA.radius = lobe_rad * (1 + 1e-2)
+#starB.radius = lobe_rad2 * (1 + 1e-2)
 
 #test = sphere(pos = vector(0, 0, 0), radius = lobe_rad, color = color.yellow)
 
@@ -51,20 +59,42 @@ starB.radius = lobe_rad2 * (1 + 1e-2)
 running = False
 button(text="Click to Run", pos=scene.title_anchor, bind=Run)
 def Run(b):
-    global running
+    global running, has_reset
     running = not running
     if running: 
         b.text = "Click to Pause"
-        print("running")
-        print(scene.range)
+        change_mA.disabled = True
+        change_mB.disabled = True
+        changeDist.disabled = True
+        A_over.disabled = True
+        B_over.disabled = True
+#        print("running")
+#        print(scene.range)
     else: 
         b.text = "Click to Run"
-        print("not running")
-        
+#        print("not running")
+        if has_reset:
+            change_mA.disabled = False
+            change_mB.disabled = False
+            changeDist.disabled = False
+            A_over.disabled = False
+            B_over.disabled = False
+            has_reset = False
+
+has_reset = False
 button(text="Reset", pos=scene.title_anchor, bind=reset)
 scene.append_to_title("\n\n")
 def reset():
-    global mA, mB, x1, x2, dist, sep_dist, q, q2, lobe_rad, lobe_rad2, sum_mass, reduced_mass, momentum, C_a, C_b, keep_running
+    global mA, mB, x1, x2, dist, sep_dist, q, q2, lobe_rad, lobe_rad2, sum_mass, reduced_mass, momentum, C_a, C_b, keep_running, has_reset, t
+    t = 0
+    has_reset = True
+    if not running:
+        change_mA.disabled = False
+        change_mB.disabled = False
+        changeDist.disabled = False
+        A_over.disabled = False
+        B_over.disabled = False
+        has_reset = False
     keep_running = True
     starA.visible = True
     starB.visible = True
@@ -87,7 +117,7 @@ def reset():
     starA.mass = mA * M0
     starB.mass = mB * M0
     
-    starA.radius = lobe_rad * (1 + 1e-2)
+    starA.radius = 2.7 * Rs
     starB.radius = 3.4 * Rs
 #    starB.radius = radius_from_mass(starB.mass, C_b, k)
     
@@ -104,7 +134,7 @@ def reset():
 #    changeDistSlider(sep_dist)
 #    change_mASlider(mA)
 #    change_mBSlider(mB)
-    dist_text.text = f"{dist:.3e} m"
+    dist_text.text = f"{dist/Rs:.3f} R☉"
     mA_text.text = f"{mA:.3f} M☉"
     mB_text.text = f"{mB:.3f} M☉"
     
@@ -114,17 +144,32 @@ def reset():
     
     C_a = starA.mass / mass_from_radius(starA.radius, 1, k)
     C_b = starB.mass / mass_from_radius(starB.radius, 1, k)
-    Ca_text.text = f"{C_a:.3e}"
-    Cb_text.text = f"{C_b:.3e}"
+    Ca_text.text = f"{C_a:.3f}"
+    Cb_text.text = f"{C_b:.3f}"
     
     draw_potential()
     
     q_text.text = f"{q:.3f}"
-    roche_text.text = f"{lobe_rad:.3e} m"
+    rocheA_text.text = f"{lobe_rad/Rs:.3f} R☉"
+    rocheB_text.text = f"{lobe_rad2/Rs:.3f} R☉"
+    
+    type_text.text = "detached"
+    
+    ar_graph.data = []
+    br_graph.data = []
+    alobe_graph.data = []
+    blobe_graph.data = []
+    am_graph.data = []
+    bm_graph.data = []
+    av_graph.data = []
+    bv_graph.data = []
+    q_graph.data = []
+    p_graph.data = []
     
     scene.autoscale = False
     scene.range = scale
     scene.autoscale = True
+    
         
 
 # sliders to adjust dist, mA, mB
@@ -151,41 +196,89 @@ def update_system():
     
     C_a = starA.mass / mass_from_radius(starA.radius, 1, k)
     C_b = starB.mass / mass_from_radius(starB.radius, 1, k)
-    Ca_text.text = f"{C_a:.3e}"
-    Cb_text.text = f"{C_b:.3e}"
+    Ca_text.text = f"{C_a:.3f}"
+    Cb_text.text = f"{C_b:.3f}"
     
     draw_potential()
     
     q_text.text = f"{q:.3f}"
-    roche_text.text = f"{lobe_rad:.3e} m"
+    rocheA_text.text = f"{lobe_rad/Rs:.3f} R☉"
+    rocheB_text.text = f"{lobe_rad2/Rs:.3f} R☉"
+    
+    A_overflow = starA.radius >= lobe_rad
+    B_overflow = starB.radius >= lobe_rad2
+    if A_overflow and B_overflow:
+        type = "contact"
+    elif A_overflow or B_overflow:
+        type = "semi-detached"
+    else:
+        type = "detached"
+    
+    type_text.text = type
+        
+    
+#scene.append_to_caption("Upon loading the program, the scene will display a binary star system with their Roche lobe equipotential drawn.\n")
+#scene.append_to_caption("The separation distance, starA mass, and starB mass sliders can be used to adjust those values respectively and the equipotential\n")
+#scene.append_to_caption("is redrawn to reflect those changes.\n")
+#scene.append_to_caption("Once the user is done adjusting the sliders, click the run button to begin the simulation. Click the reset button to reset the inputs\n")
+#scene.append_to_caption("to their initial values.\n")
+#scene.append_to_caption("All the graphs display properties/info of the stars over time like their velocities, mass, and radius.\ \MH☉")    
+
+scene.append_to_caption("Upon loading the program, the scene will display a binary star system with their Roche lobe equipotential drawn.\n")
+scene.append_to_caption("The separation distance, starA mass, and starB mass sliders can be used to adjust those values respectively and the equipotential\n")
+scene.append_to_caption("is redrawn to reflect those changes.\n")
+scene.append_to_caption("Once the user is done adjusting the sliders, click the run button to begin the simulation. Click the reset button to reset the inputs\n")
+scene.append_to_caption("to their initial values.\n")
+scene.append_to_caption("All the graphs display properties/info of the stars over time like their velocities, mass, and radius.\n\n")
+scene.append_to_caption("We approximated the density per unit volume of the stars using an exponential function \\(e^{-kt}\\) for some constant \\(k\\), which\n")
+scene.append_to_caption("we will call the <i>mass density constant</i> in this project. This is meant to give the viewer an idea of the relative densities of the\n")
+scene.append_to_caption("stars compared to each other.\n\n")
     
     
 #######################
 # DISPLAY INFO
 ######################
-scene.append_to_caption("\nMass Ratio q = ")
+scene.append_to_caption("\nSystem Type = ")
+type_text = wtext(text="detached")
+
+scene.append_to_caption("\nMass Ratio = ")
 q_text = wtext(text=f"{q:.3f}")
-scene.append_to_caption("\nRobe Lobe Radius = ")
-roche_text = wtext(text=f"{lobe_rad:.3e} m")
+
+scene.append_to_caption("\nRobe Lobe A Radius = ")
+rocheA_text = wtext(text=f"{lobe_rad2/Rs:.3f} R☉")
+
+scene.append_to_caption("\nRobe Lobe B Radius = ")
+rocheB_text = wtext(text=f"{lobe_rad2/Rs:.3f} R☉")
+
 scene.append_to_caption("\nMass Density Const of A = ")
-Ca_text = wtext(text=f"{C_a:.3e}")
+Ca_text = wtext(text=f"{C_a:.3f}")
 scene.append_to_caption("\nMass Density Const of B = ")
-Cb_text = wtext(text=f"{C_b:.3e}")
+Cb_text = wtext(text=f"{C_b:.3f}")
+MathJax.Hub.Queue(["Typeset",MathJax.Hub])
+
+#######################
+# CHANGE RADIUS
+#######################
+scene.append_to_caption("\n\n")
+drawP_btn = button(text="Stop Drawing Equipotential", bind=change_draw)
+scene.append_to_caption("\n\n")
+A_over = button(text="StarA Overflow", bind=setA_radius)
+B_over = button(text="StarB Overflow", bind=setB_radius)
 
 
 #######################
 # DISTANCE SLIDER
 #######################
 scene.append_to_caption("\n\n")
-scene.append_to_caption("Separation Dist. (m): ")
+scene.append_to_caption("Separation Dist. (Solar Radii): ")
 scene.append_to_caption("\n")
 def changeDistSlider(evt):
     global dist
     dist = evt.value
-    dist_text.text = f"{evt.value:.3e} m"
+    dist_text.text = f"{evt.value/Rs:.3f} R☉"
     update_system()
 changeDist = slider(bind=changeDistSlider, min=0.5*1e11, max=2*1e11, value=dist, length=300)
-dist_text = wtext(text=f"{dist:.3e} m")
+dist_text = wtext(text=f"{dist/Rs:.3f} R☉")
 
 
 #######################
@@ -225,8 +318,8 @@ mB_text = wtext(text=f"{mB:.3f} M☉")
 #######################
 # Redraw potential btn 
 #######################
-scene.append_to_caption("\n\n")
-button(text="Draw Equipotential", bind=draw_potential)
+#scene.append_to_caption("\n\n")
+#drawP_btn = button(text="Stop Drawing Equipotential", bind=change_draw)
 
 
 
@@ -255,8 +348,8 @@ def mass_from_radius(R,C,k):
     
 C_a = starA.mass / mass_from_radius(starA.radius, 1, k)
 C_b = starB.mass / mass_from_radius(starB.radius, 1, k)
-Ca_text.text = f"{C_a:.3e}"
-Cb_text.text = f"{C_b:.3e}"
+Ca_text.text = f"{C_a:.3f}"
+Cb_text.text = f"{C_b:.3f}"
 
 def radius_from_mass(new_mass, C, k):
     left = 0
@@ -332,6 +425,16 @@ def draw_potential(b):
 #    print("done drawing equipotential")
     
 draw_potential()
+
+drawP = True
+def change_draw():
+    global drawP
+    drawP = not drawP
+    if drawP:
+        drawP_btn.text = "Stop Drawing Equipotential"
+    else:
+        drawP_btn.text = "Draw Equipotential"
+
 scale = scene.range
     
 t=0; dt=3600
@@ -341,17 +444,28 @@ transfer_rate = 1e-7
 
 graph_w = 480
 graph_h = 360
-vel_graph = graph(title='Velocity over time', xtitle='Time', ytitle='Velocity', width=graph_w, height=graph_h, align='left')
-av_graph = gcurve(color=color.red, label='StarA Velocity')
-bv_graph = gcurve(color=color.blue, label='StarB Velocity')
 
-rad_graph = graph(title='Radius over time', xtitle='Time', ytitle='Radius', width=graph_w, height=graph_h, align='left')
+rad_graph = graph(title='Radius Over Time', xtitle='Time (days)', ytitle='Radius (R☉)', width=graph_w, height=graph_h, align='left')
 ar_graph = gcurve(color=color.red, label='StarA Radius')
 br_graph = gcurve(color=color.blue, label='StarB Radius')
 
-mass_graph = graph(title='Mass over time', xtitle='Time', ytitle='Mass', width=graph_w, height=graph_h, align='left')
+#roche_graph = graph(title='Roche Lobe Radius Over Time', xtitle='Time (days)', ytitle='Lobe Radius (R☉)', width=graph_w, height=graph_h, align='left')
+alobe_graph = gcurve(color=color.orange, label='Roche Lobe A Radius')
+blobe_graph = gcurve(color=color.purple, label='Roche Lobe B Radius')
+
+mass_graph = graph(title='Mass Over Time', xtitle='Time (days)', ytitle='Mass (M☉)', width=graph_w, height=graph_h, align='left')
 am_graph = gcurve(color=color.red, label='StarA Mass')
 bm_graph = gcurve(color=color.blue, label='StarB Mass')
+
+vel_graph = graph(title='Velocity Over Time', xtitle='Time (days)', ytitle='Velocity (m/s)', width=graph_w, height=graph_h, align='left')
+av_graph = gcurve(color=color.red, label='StarA Velocity')
+bv_graph = gcurve(color=color.blue, label='StarB Velocity')
+
+ratio_graph = graph(title='Mass Ratio of StarB to StarA Over Time', xtitle='Time (days)', ytitle='Mass Ratio', width=graph_w, height=graph_h, align='left')
+q_graph = gcurve(color=color.green, label='Mass Ratio of B to A')
+
+period_graph = graph(title='Orbital Period Over Time', xtitle='Time (days)', ytitle='Period (days)', width=graph_w, height=graph_h, align='left')
+p_graph = gcurve(color=color.cyan, label='Orbital Period')
 
 type = "detached"
 
@@ -379,6 +493,8 @@ while(True):
             type = "semi-detached"
         else:
             type = "detached"
+        
+        type_text.text = type
         
         if type == "semi-detached":
             if A_overflow:
@@ -409,20 +525,20 @@ while(True):
             reduced_mass = starA.mass * starB.mass / sum_mass
             
             # using conservation of angular momentum to calc vel
-            sep_dist = mag(starB.pos - starA.pos)
-            v_rel = momentum / (reduced_mass * sep_dist)
-            r_hat = hat(starB.pos - starA.pos)
-            t_hat = vector(-r_hat.y, r_hat.x, 0)
-            vA = v_rel * starB.mass / (starA.mass + starB.mass)
-            vB = v_rel * starA.mass / (starA.mass + starB.mass)
-            starA.velocity = -vA * t_hat
-            starB.velocity =  vB * t_hat
+#            sep_dist = mag(starB.pos - starA.pos)
+#            v_rel = momentum / (reduced_mass * sep_dist)
+#            r_hat = hat(starB.pos - starA.pos)
+#            t_hat = vector(-r_hat.y, r_hat.x, 0)
+#            vA = v_rel * starB.mass / (starA.mass + starB.mass)
+#            vB = v_rel * starA.mass / (starA.mass + starB.mass)
+#            starA.velocity = -vA * t_hat
+#            starB.velocity =  vB * t_hat
             
             # not much mass is transferred and stop really fast
 #            sep_dist = mag(starA.pos - starB.pos)
 
             # change separation dist using conservation of momentum but only reflected in lobe_rad not actual dist between stars
-#            sep_dist = (momentum ** 2) / (reduced_mass ** 2 * G * sum_mass)
+            sep_dist = (momentum ** 2) / (reduced_mass ** 2 * G * sum_mass)
 #            angle1 = atan2(starA.pos.y / starA.pos.x)
 #            angle2 = atan2(starB.pos.y / starB.pos.x)
 #            x1 = -sep_dist * starB.mass / sum_mass
@@ -473,30 +589,46 @@ while(True):
                 vB = v_rel * starA.mass / (starA.mass + starB.mass)
                 starA.velocity = -vA * t_hat
                 starB.velocity =  vB * t_hat
+                
+                lobe_rad = sep_dist * (0.49 * q2 ** .6666667) / (0.6 * q2 ** .6666667 + log(1 + q2 ** .3333333))
+                lobe_rad2 = sep_dist * (0.49 * q ** .6666667) / (0.6 * q ** .6666667 + log(1 + q ** .3333333))
             
-        if t % (3600 * 1000) == 0:
-            print("radius of star B: " + starB.radius)
-            print("total momentum: " + mag(P))
-        if t % (3600 * 10) == 0 and (starA.pos-starB.pos).mag > (starA.radius+starB.radius):
+#        if t % (3600 * 1000) == 0:
+#            print("radius of star B: " + starB.radius)
+#            print("total momentum: " + mag(P))
+        if t % (3600 * 10) == 0 and (starA.pos-starB.pos).mag > (starA.radius+starB.radius) and drawP:
             draw_potential()
         
         q_text.text = f"{q:.3f}"
-        roche_text.text = f"{lobe_rad:.3e} m"
-        dist_text.text = f"{sep_dist:.3e} m"
+        rocheA_text.text = f"{lobe_rad/Rs:.3f} R☉"
+        rocheB_text.text = f"{lobe_rad2/Rs:.3f} R☉"
+        dist_text.text = f"{sep_dist/Rs:.3f} R☉"
         mA_text.text = f"{starA.mass/M0:.3f} M☉"
         mB_text.text = f"{starB.mass/M0:.3f} M☉"
         
-        vel_graph.select()
-        av_graph.plot(t, mag(starA.velocity))
-        bv_graph.plot(t, mag(starB.velocity))
         
         rad_graph.select()
-        ar_graph.plot(t, starA.radius)
-        br_graph.plot(t, starB.radius)
+        ar_graph.plot(t/(3600*24), starA.radius/Rs)
+        br_graph.plot(t/(3600*24), starB.radius/Rs)
+        
+#        roche_graph.select()
+        alobe_graph.plot(t/(3600*24), lobe_rad/Rs)
+        blobe_graph.plot(t/(3600*24), lobe_rad2/Rs)
         
         mass_graph.select()
-        am_graph.plot(t, starA.mass)
-        bm_graph.plot(t, starB.mass)
-         
+        am_graph.plot(t/(3600*24), starA.mass/M0)
+        bm_graph.plot(t/(3600*24), starB.mass/M0)
+        
+        vel_graph.select()
+        av_graph.plot(t/(3600*24), mag(starA.velocity))
+        bv_graph.plot(t/(3600*24), mag(starB.velocity))
+        
+        ratio_graph.select()
+        q_graph.plot(t/(3600*24), q)
+        
+        period_graph.select()
+        T = 2*pi*sqrt(sep_dist**3 / (G*sum_mass))
+        p_graph.plot(t/(3600*24), T/(3600*24))
+                 
         
         t = t+dt
